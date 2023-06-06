@@ -24,7 +24,7 @@ function Annotation() {
       const intersects = raycaster.intersectObjects(scene.children);
       if (intersects.length > 0) {
         const point = intersects[0].point;
-        const positionAttr = new THREE.Float32BufferAttribute([point.x, point.y, point.z], 3);
+        const positionAttr = new THREE.Float32BufferAttribute([point.x + 0.1, point.y + 0.1, point.z + 0.1], 3);
         points.current.geometry.setAttribute('position', positionAttr);
         positionAttr.needsUpdate = true;
       }
@@ -33,27 +33,55 @@ function Annotation() {
 
   return null;
 }
+function Drawing() {
+  const { scene, camera, raycaster, mouse, gl } = useThree();
+  const [points, setPoints] = useState<THREE.Vector3[]>([]);
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
+  const pointMaterial = new THREE.PointsMaterial({ color: 0x00ff00, size: 0.2 });
+  const line = useRef<THREE.Line>();
+  const pointGroup = useRef<THREE.Group>(new THREE.Group());
 
+  useEffect(() => {
+    scene.add(pointGroup.current);
+  }, [scene]);
 
-function Box(props: JSX.IntrinsicElements['mesh']) {
-  const ref = useRef<THREE.Mesh>(null!)
-  const [hovered, hover] = useState(false)
-  const [clicked, click] = useState(false)
-  useFrame(() => (ref.current.rotation.x += 0.01))
+  useEffect(() => {
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    line.current = new THREE.Line(geometry, lineMaterial);
+    scene.add(line.current);
+  }, [scene]);
 
-  return (
-    <mesh
-      {...props}
-      ref={ref}
-      scale={clicked ? 1.5 : 1}
-      onClick={() => click(!clicked)}
-      onPointerOver={() => hover(true)}
-      onPointerOut={() => hover(false)}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color={hovered ? 'hotpink' : 'orange'} />
-    </mesh>
-  )
+  useEffect(() => {
+    const onClick = () => {
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(scene.children);
+      if (intersects.length > 0) {
+        const point = intersects[0].point;
+        setPoints(oldPoints => [...oldPoints, point]);
+
+        const pointGeometry = new THREE.BufferGeometry().setFromPoints([point]);
+        pointGeometry.setAttribute('position', new THREE.Float32BufferAttribute([point.x + 0.1, point.y + 0.1, point.z + 0.1], 3));
+        const pointObject = new THREE.Points(pointGeometry, pointMaterial);
+        pointGroup.current.add(pointObject);
+      }
+    };
+
+    gl.domElement.addEventListener('click', onClick);
+    return () => {
+      gl.domElement.removeEventListener('click', onClick);
+    };
+  }, [camera, raycaster, mouse, gl.domElement, scene.children]);
+
+  useEffect(() => {
+    if (line.current) {
+      line.current.geometry.dispose();
+      line.current.geometry = new THREE.BufferGeometry().setFromPoints(points);
+    }
+  }, [points]);
+
+  return null;
 }
+
 
 const GLTFDropzone: React.FC = () => {
   const [modelUrl, setModelUrl] = useState<string | null>(null);
@@ -84,6 +112,7 @@ const GLTFDropzone: React.FC = () => {
           <Suspense fallback={null}>
             <Model url={modelUrl} />
             <Annotation />
+            <Drawing />
             <OrbitControls />
             <ambientLight intensity={0.5} />
             <spotLight intensity={0.8} position={[300, 300, 4000]} />
