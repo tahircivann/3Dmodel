@@ -33,13 +33,19 @@ function Annotation() {
 
   return null;
 }
+
+
 function Drawing() {
+  console.log('shapeRef');;
   const { scene, camera, raycaster, mouse, gl } = useThree();
-  const [points, setPoints] = useState<THREE.Vector3[]>([]);
   const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
   const pointMaterial = new THREE.PointsMaterial({ color: 0x00ff00, size: 0.2 });
   const line = useRef<THREE.Line>();
   const pointGroup = useRef<THREE.Group>(new THREE.Group());
+  const shapeRef = useRef<THREE.Mesh>();
+  const [points, setPoints] = useState<THREE.Vector2[]>([]);
+
+  console.log(points);
 
   useEffect(() => {
     scene.add(pointGroup.current);
@@ -52,15 +58,21 @@ function Drawing() {
   }, [scene]);
 
   useEffect(() => {
-    const onClick = () => {
+    const onClick = (event: MouseEvent) => {
+      event.preventDefault();
+      const target = event.target as HTMLElement;
+      const rect = target.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      mouse.set(x, y);
+
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(scene.children);
       if (intersects.length > 0) {
         const point = intersects[0].point;
-        setPoints(oldPoints => [...oldPoints, point]);
+        setPoints(oldPoints => [...oldPoints, new THREE.Vector2(point.x, point.y)]);
 
         const pointGeometry = new THREE.BufferGeometry().setFromPoints([point]);
-        pointGeometry.setAttribute('position', new THREE.Float32BufferAttribute([point.x + 0.1, point.y + 0.1, point.z + 0.1], 3));
         const pointObject = new THREE.Points(pointGeometry, pointMaterial);
         pointGroup.current.add(pointObject);
       }
@@ -78,6 +90,15 @@ function Drawing() {
       line.current.geometry = new THREE.BufferGeometry().setFromPoints(points);
     }
   }, [points]);
+
+  useEffect(() => {
+    if (points.length < 3) return;
+    const shape = new THREE.Shape(points);
+    const geometry = new THREE.ShapeGeometry(shape);
+    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
+    shapeRef.current = new THREE.Mesh(geometry, material);
+    scene.add(shapeRef.current);
+  }, [scene, points]);
 
   return null;
 }
