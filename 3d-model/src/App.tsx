@@ -24,7 +24,7 @@ function Annotation() {
       const intersects = raycaster.intersectObjects(scene.children);
       if (intersects.length > 0) {
         const point = intersects[0].point;
-        const positionAttr = new THREE.Float32BufferAttribute([point.x + 0.1, point.y + 0.1, point.z + 0.1], 3);
+        const positionAttr = new THREE.Float32BufferAttribute([point.x + 0.1, point.y + 0.1, point.z + 0.5], 3);
         points.current.geometry.setAttribute('position', positionAttr);
         positionAttr.needsUpdate = true;
       }
@@ -33,14 +33,37 @@ function Annotation() {
 
   return null;
 }
+interface DrawingProps {
+  orbitControlsEnabled: boolean;
+}
 
-
-function Drawing() {
+function Drawing({ orbitControlsEnabled }: DrawingProps) {
   const { scene, camera, raycaster, mouse } = useThree();
   const line = useRef<THREE.Line>();
   const [points, setPoints] = useState<THREE.Vector3[]>([]);
   const [drawing, setDrawing] = useState(false);
   const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
+  //Start Drawing with false
+  // Stop drawing when OrbitControls are enabled
+  useEffect(() => {
+    if (orbitControlsEnabled) {
+      setDrawing(false);
+    } else {
+      // Start a new drawing by clearing points
+      setPoints([]);
+      setDrawing(false);
+    }
+  }, [orbitControlsEnabled]);
+
+  useEffect(() => {
+    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mouseup', onMouseUp);
+
+    return () => {
+      window.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [orbitControlsEnabled]);  // add orbitControlsEnabled as a dependency
 
   useEffect(() => {
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
@@ -49,17 +72,23 @@ function Drawing() {
   }, [scene]);
 
   const onMouseDown = () => {
-    setDrawing(true);
+    if (!orbitControlsEnabled) {
+      window.addEventListener('mousedown', onMouseDown);
+      window.addEventListener('mouseup', onMouseUp);
+      setDrawing(true);
+    }
   };
 
   const onMouseUp = () => {
-    setDrawing(false);
+    if (!orbitControlsEnabled) {
+      window.addEventListener('mousedown', onMouseDown);
+      window.addEventListener('mouseup', onMouseUp);
+      setDrawing(false);
+
+    }
   };
 
   useEffect(() => {
-    window.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mouseup', onMouseUp);
-
     return () => {
       window.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('mouseup', onMouseUp);
@@ -97,6 +126,21 @@ const GLTFDropzone: React.FC = () => {
     },
   });
 
+  const [orbitControlsEnabled, setOrbitControlsEnabled] = useState<boolean>(true);
+
+  const toggleOrbitControls = (event: KeyboardEvent) => {
+    if (event.key === 'd' || event.key === 'D') {
+      setOrbitControlsEnabled(prevState => !prevState);
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('keydown', toggleOrbitControls);
+    return () => {
+      window.removeEventListener('keydown', toggleOrbitControls);
+    }
+  }, []);
+
   return (
     <>
       <div {...getRootProps()} style={{
@@ -116,8 +160,8 @@ const GLTFDropzone: React.FC = () => {
           <Suspense fallback={null}>
             <Model url={modelUrl} />
             <Annotation />
-            <Drawing />
-            <OrbitControls />
+            <Drawing orbitControlsEnabled={orbitControlsEnabled} />
+            <OrbitControls enabled={orbitControlsEnabled} />
             <ambientLight intensity={0.5} />
             <spotLight intensity={0.8} position={[300, 300, 4000]} />
             <axesHelper args={[100]}
