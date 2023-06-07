@@ -36,53 +36,25 @@ function Annotation() {
 
 
 function Drawing() {
-  console.log('shapeRef');;
-  const { scene, camera, raycaster, mouse, gl } = useThree();
-  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
-  const pointMaterial = new THREE.PointsMaterial({ color: 0x00ff00, size: 0.2 });
+  const { scene, camera, raycaster, mouse } = useThree();
   const line = useRef<THREE.Line>();
-  const pointGroup = useRef<THREE.Group>(new THREE.Group());
-  const shapeRef = useRef<THREE.Mesh>();
-  const [points, setPoints] = useState<THREE.Vector2[]>([]);
-
-  console.log(points);
-
-  useEffect(() => {
-    scene.add(pointGroup.current);
-  }, [scene]);
+  const [points, setPoints] = useState<THREE.Vector3[]>([]);
+  const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
 
   useEffect(() => {
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    line.current = new THREE.Line(geometry, lineMaterial);
+    line.current = new THREE.Line(geometry, material);
     scene.add(line.current);
   }, [scene]);
 
-  useEffect(() => {
-    const onClick = (event: MouseEvent) => {
-      event.preventDefault();
-      const target = event.target as HTMLElement;
-      const rect = target.getBoundingClientRect();
-      const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-      mouse.set(x, y);
-
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(scene.children);
-      if (intersects.length > 0) {
-        const point = intersects[0].point;
-        setPoints(oldPoints => [...oldPoints, new THREE.Vector2(point.x, point.y)]);
-
-        const pointGeometry = new THREE.BufferGeometry().setFromPoints([point]);
-        const pointObject = new THREE.Points(pointGeometry, pointMaterial);
-        pointGroup.current.add(pointObject);
-      }
-    };
-
-    gl.domElement.addEventListener('click', onClick);
-    return () => {
-      gl.domElement.removeEventListener('click', onClick);
-    };
-  }, [camera, raycaster, mouse, gl.domElement, scene.children]);
+  useFrame(() => {
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(scene.children);
+    if (intersects.length > 0) {
+      const point = intersects[0].point;
+      setPoints((oldPoints) => [...oldPoints, point]);
+    }
+  });
 
   useEffect(() => {
     if (line.current) {
@@ -90,15 +62,6 @@ function Drawing() {
       line.current.geometry = new THREE.BufferGeometry().setFromPoints(points);
     }
   }, [points]);
-
-  useEffect(() => {
-    if (points.length < 3) return;
-    const shape = new THREE.Shape(points);
-    const geometry = new THREE.ShapeGeometry(shape);
-    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
-    shapeRef.current = new THREE.Mesh(geometry, material);
-    scene.add(shapeRef.current);
-  }, [scene, points]);
 
   return null;
 }
