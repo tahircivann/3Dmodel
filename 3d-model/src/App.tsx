@@ -39,6 +39,7 @@ function Drawing() {
   const { scene, camera, raycaster, mouse } = useThree();
   const line = useRef<THREE.Line>();
   const [points, setPoints] = useState<THREE.Vector3[]>([]);
+  const [drawing, setDrawing] = useState(false);
   const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
 
   useEffect(() => {
@@ -47,12 +48,32 @@ function Drawing() {
     scene.add(line.current);
   }, [scene]);
 
+  const onMouseDown = () => {
+    setDrawing(true);
+  };
+
+  const onMouseUp = () => {
+    setDrawing(false);
+  };
+
+  useEffect(() => {
+    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mouseup', onMouseUp);
+
+    return () => {
+      window.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
   useFrame(() => {
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(scene.children);
-    if (intersects.length > 0) {
-      const point = intersects[0].point;
-      setPoints((oldPoints) => [...oldPoints, point]);
+    if (drawing) {
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(scene.children);
+      if (intersects.length > 0) {
+        const point = intersects[0].point;
+        setPoints((oldPoints) => [...oldPoints, point]);
+      }
     }
   });
 
@@ -65,7 +86,6 @@ function Drawing() {
 
   return null;
 }
-
 
 const GLTFDropzone: React.FC = () => {
   const [modelUrl, setModelUrl] = useState<string | null>(null);
