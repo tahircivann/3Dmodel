@@ -5,6 +5,7 @@ import { Canvas, useFrame, useThree, extend } from "@react-three/fiber";
 import { Stats, OrbitControls, useGLTF, Loader } from "@react-three/drei";
 import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader';
 import { useDropzone } from 'react-dropzone';
+import { TubeGeometry, MeshBasicMaterial } from 'three';
 
 
 function Annotation() {
@@ -39,10 +40,13 @@ interface DrawingProps {
 
 function Drawing({ orbitControlsEnabled }: DrawingProps) {
   const { scene, camera, raycaster, mouse } = useThree();
-  const line = useRef<THREE.Line>();
+  const line = useRef<THREE.Line | null>(null);
+  const tube = useRef<THREE.Mesh | null>(null);
   const [points, setPoints] = useState<THREE.Vector3[]>([]);
   const [drawing, setDrawing] = useState(false);
+  const [tubed, setTubed] = useState(false);
   const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
+  const tubeMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
   //Start Drawing with false
   // Stop drawing when OrbitControls are enabled
   useEffect(() => {
@@ -112,6 +116,58 @@ function Drawing({ orbitControlsEnabled }: DrawingProps) {
       line.current.geometry = new THREE.BufferGeometry().setFromPoints(points);
     }
   }, [points]);
+
+  useEffect(() => {
+    if (tubed && points.length > 1) {
+      // remove previous tube or line from the scene
+      if (tube.current) {
+        scene.remove(tube.current);
+        tube.current.geometry.dispose();
+        tube.current = null;
+      }
+      if (line.current) {
+        scene.remove(line.current);
+        line.current.geometry.dispose();
+        line.current = null;
+      }
+
+      const curve = new THREE.CatmullRomCurve3(points);
+      const tubeGeometry = new THREE.TubeGeometry(curve, 20, 0.5, 8, false);
+      tube.current = new THREE.Mesh(tubeGeometry, tubeMaterial);
+      scene.add(tube.current);
+    } else if (!tubed && points.length > 1) {
+      // remove previous tube or line from the scene
+      if (tube.current) {
+        scene.remove(tube.current);
+        tube.current.geometry.dispose();
+        tube.current = null;
+      }
+      if (line.current) {
+        scene.remove(line.current);
+        line.current.geometry.dispose();
+        line.current = null;
+      }
+
+      line.current = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), material);
+      scene.add(line.current);
+    }
+  }, [points, tubed]);
+
+
+
+  const toggleTube = (event: KeyboardEvent) => {
+    if (event.key === 't' || event.key === 'T') {
+      setTubed(prevState => !prevState);
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('keydown', toggleTube);
+    return () => {
+      window.removeEventListener('keydown', toggleTube);
+    }
+  }, []);
+
 
   return null;
 }
