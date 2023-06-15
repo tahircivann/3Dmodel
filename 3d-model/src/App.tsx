@@ -3,7 +3,8 @@ import * as React from 'react';
 import { useRef, useState, Suspense, useEffect } from 'react';
 import { Canvas, useFrame, useThree, extend } from "@react-three/fiber";
 import { Stats, OrbitControls, useGLTF, Loader } from "@react-three/drei";
-import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader';
+import { GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import { useDropzone } from 'react-dropzone';
 import { TubeGeometry, MeshBasicMaterial } from 'three';
 
@@ -174,13 +175,34 @@ function Drawing({ orbitControlsEnabled }: DrawingProps) {
 
 const GLTFDropzone: React.FC = () => {
   const [modelUrl, setModelUrl] = useState<string | null>(null);
+
+  const [model, setModel] = useState<THREE.Group | null>(null);
   const { getRootProps, getInputProps } = useDropzone({
     accept: { gltf: ['.gltf'], glb: ['.glb'] },
-    onDrop: ([file]) => {
+    onDrop: async ([file]) => {
       const url = URL.createObjectURL(file);
       setModelUrl(url);
+
+      const loader = new GLTFLoader();
+      const dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath('/path/to/draco/');
+      loader.setDRACOLoader(dracoLoader);
+
+      loader.load(
+        url,
+        (gltf: GLTF) => {
+          setModel(gltf.scene);
+        },
+        (xhr) => {
+          console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+        },
+        (error) => {
+          console.log('An error happened', error);
+        },
+      );
     },
   });
+
 
   const [orbitControlsEnabled, setOrbitControlsEnabled] = useState<boolean>(true);
 
